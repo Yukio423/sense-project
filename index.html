@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141414">
+  <title>Afterimage · Color Experiment</title>
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+  <main id="intro">
+    <header><a class="brand" href="./">Color<span>AFTERIMAGE</span></a><span class="edition">VISUAL EXPERIMENT / No. 001</span></header>
+    <section class="hero">
+      <p class="eyebrow"><span></span> 105 SECONDS. ANOTHER SIDE OF COLOR.</p>
+      <h1>When color fades,<br>what <span class="accent">remains?</span></h1>
+      <p class="description">Keep your gaze near the center for 30 seconds.<br>When the screen changes, notice the colors that linger.</p>
+      <button id="start" class="primary">Start experiment <span>↗</span></button>
+      <span class="duration">3 color pairs · 30s + 5s each</span>
+    </section>
+    <section class="palette" aria-label="Three experimental color pairs">
+      <article><div class="swatch"><span style="background:#ff202d"></span><span style="background:#fff"></span><b>01</b></div><div class="caption"><h2>Red / White</h2><span>RED → WHITE</span></div></article>
+      <article><button class="palette-choice" id="group-1" aria-label="Start Green / White experiment"><div class="swatch"><span style="background:#00ff00"></span><span style="background:#fff"></span><b>02</b></div><div class="caption"><span class="palette-name">Green / White</span><span>GREEN → WHITE</span></div></button></article>
+      <article><button class="palette-choice" id="group-2" aria-label="Start Blue / White experiment"><div class="swatch"><span style="background:#0000ff"></span><span style="background:#fff"></span><b>03</b></div><div class="caption"><span class="palette-name">Blue / White</span><span>BLUE → WHITE</span></div></button></article>
+    </section>
+    <footer><span>Hold your gaze. Notice the change.</span><span>Use a comfortable brightness. Exit anytime if uncomfortable.</span></footer>
+  </main>
+  <section id="experiment" hidden aria-label="Color experiment">
+    <div class="session-top"><span id="phase-label"></span><nav class="session-controls" aria-label="Experiment controls"><button id="previous" class="quiet">← Previous group</button><button id="exit" class="quiet">Home</button><button id="fullscreen" class="quiet" aria-pressed="false">Enter fullscreen ⛶</button></nav></div>
+    
+    <div class="session-bottom"><div id="countdown-wrap"><p>Keep looking at the center</p><div class="clock"><span id="countdown">30</span><span class="unit">s</span></div></div><div id="observe" hidden>Notice the colors you see</div><button id="pause" class="quiet">Pause Ⅱ</button></div>
+    <div class="progress"><div id="progress-fill"></div></div>
+  </section>
+  <section id="complete" hidden><p class="eyebrow">EXPERIMENT COMPLETE</p><h1>Color has faded.<br>The impression stays.</h1><p class="description">You have completed all three color pairs.<br>Every afterimage may feel a little different.</p><button id="replay" class="primary">Try again <span>↻</span></button><button id="home" class="home">Home</button></section>
+  <script>
+    const pairs = [
+      {name:'Red / White',colors:['#ff202d','#ffffff']},
+      {name:'Green / White',colors:['#00ff00','#ffffff']},
+      {name:'Blue / White',colors:['#0000ff','#ffffff']}
+    ];
+    const $ = id => document.getElementById(id);
+    let group = 0, phase = 0, remaining = 30000, deadline = 0, timer = null, paused = false;
+    function show(screen){ ['intro','experiment','complete'].forEach(id => $(id).hidden = id !== screen); }
+    function stop(){ clearInterval(timer); timer = null; }
+    function render(){
+      const color = pairs[group].colors[phase];
+      $('experiment').style.background = color;
+      $('experiment').classList.toggle('light', phase === 1);
+      $('phase-label').textContent = `0${group + 1} / 03 — ${pairs[group].name} · ${phase === 0 ? 'Focus' : 'Observe'}`;
+      $('countdown-wrap').hidden = phase === 1;
+      $('observe').hidden = phase === 0;
+      $('countdown').textContent = Math.ceil(remaining / 1000).toString().padStart(2,'0');
+      $('progress-fill').style.width = `${(1 - remaining / (phase === 0 ? 30000 : 5000)) * 100}%`;
+      $('pause').textContent = paused ? 'Resume ▶' : 'Pause Ⅱ';
+      $('previous').disabled = group === 0;
+    }
+    function tick(){
+      remaining = Math.max(0, deadline - performance.now());
+      if(remaining === 0){
+        if(phase === 0){ phase = 1; remaining = 5000; }
+        else { group++; phase = 0; remaining = 30000; }
+        if(group === pairs.length){stop(); show('complete'); return;}
+        deadline = performance.now() + remaining;
+      }
+      render();
+    }
+    function run(){deadline = performance.now() + remaining; timer = setInterval(tick, 40);}
+    function start(startGroup = 0){stop(); group = startGroup; phase = 0; remaining = 30000; paused = false; show('experiment'); render(); run();}
+    function togglePause(){if(paused){paused = false; run();}else{remaining = Math.max(0,deadline-performance.now()); stop(); paused = true;} render();}
+    $('start').onclick = () => start();
+    $('group-1').onclick = () => start(1);
+    $('group-2').onclick = () => start(2);
+    $('replay').onclick = () => start();
+    $('pause').onclick = togglePause;
+    function home(){stop(); show('intro'); $('start').focus();}
+    $('previous').onclick = () => {
+      if(group === 0) return;
+      stop(); group--; phase = 0; remaining = 30000; paused = false; render(); run();
+    };
+    function updateFullscreen(){
+      const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      $('fullscreen').textContent = active ? 'Exit fullscreen ⛶' : 'Enter fullscreen ⛶';
+      $('fullscreen').setAttribute('aria-pressed', String(active));
+    }
+    $('fullscreen').onclick = async () => {
+      try {
+        if(document.fullscreenElement || document.webkitFullscreenElement){
+          const exit = document.exitFullscreen || document.webkitExitFullscreen;
+          await exit.call(document);
+        } else {
+          const root = document.documentElement;
+          const enter = root.requestFullscreen || root.webkitRequestFullscreen;
+          if(!enter) { alert('Fullscreen is not supported in this browser.'); return; }
+          await enter.call(root);
+        }
+        updateFullscreen();
+      } catch(error) { alert('Unable to change fullscreen mode. Please try again in a supported browser.'); }
+    };
+    document.addEventListener('fullscreenchange', updateFullscreen);
+    document.addEventListener('webkitfullscreenchange', updateFullscreen);
+    $('exit').onclick = home;
+    $('home').onclick = home;
+    document.addEventListener('keydown', e => {if(!$('experiment').hidden){if(e.code === 'Space' && e.target.tagName !== 'BUTTON'){e.preventDefault(); togglePause();}}});
+    document.addEventListener('visibilitychange', () => {if(document.hidden && !$('experiment').hidden && !paused)togglePause();});
+  </script>
+</body>
+</html>
